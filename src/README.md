@@ -14,3 +14,7 @@ pip install pulsar-client
 kubectl port-forward svc/pulsar-proxy 6650:6650
 
 
+helm dependency build
+
+
+helm install pulsar -f my-values.yaml ./charts/pulsar
