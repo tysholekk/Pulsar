@@ -1,0 +1,53 @@
+components:
+  zookeeper: true
+  bookkeeper: true
+  broker: true
+  proxy: true
+  pulsar_manager: false
+  autorecovery: true
+  toolset: true
+
+replicaCount:
+  zookeeper: 3
+  bookkeeper: 3
+  broker: 3
+  proxy: 1
+
+bookkeeper:
+  configData:
+    PULSAR_MEM: "-Xms512m -Xmx512m -XX:MaxDirectMemorySize=1g"
+    bookie.conf: |
+      journalDirectories=/bk/journal
+      ledgerDirectories=/bk/ledgers
+      ensembleSize=3
+      writeQuorum=3
+      ackQuorum=2
+      statsProviderClass=org.apache.bookkeeper.stats.prometheus.PrometheusMetricsProvider
+      readTimeout=120
+      writeTimeout=120
+
+broker:
+  configData:
+    defaultNumberOfNamespaceBundles: "1"
+    managedLedgerDefaultEnsembleSize: "3"
+    managedLedgerDefaultWriteQuorum: "3"
+    managedLedgerDefaultAckQuorum: "2"
+    allowAutoTopicCreation: "true"
+    allowAutoTopicCreationType: "partitioned"
+
+toolset:
+  enabled: true
+
+zookeeper:
+  replicaCount: 3
+  configData:
+    PULSAR_MEM: "-Xms512m -Xmx512m"
+    zoo.cfg: |
+      tickTime=2000
+      dataDir=/data
+      clientPort=2181
+      initLimit=10
+      syncLimit=5
+#      server.0=pulsar-zookeeper-0.pulsar-zookeeper.default.svc.cluster.local:2888:3888
+#      server.1=pulsar-zookeeper-1.pulsar-zookeeper.default.svc.cluster.local:2888:3888
+#      server.2=pulsar-zookeeper-2.pulsar-zookeeper.default.svc.cluster.local:2888:3888
