@@ -1,0 +1,101 @@
+components:
+  zookeeper: true
+  bookkeeper: true
+  broker: true
+  proxy: true
+  autorecovery: true
+  toolset: true
+  prometheus: false
+  pulsar_manager: false
+  functions: false
+  function_worker: false
+
+replicaCount:
+  zookeeper: 3
+  bookkeeper: 3
+  broker: 3
+  proxy: 1
+
+zookeeper:
+  securityContext:
+    fsGroup: 1000
+  affinity: {}
+  podMonitor:
+    enabled: false
+  metrics:
+    enabled: false
+  configData:
+    PULSAR_MEM: "-Xms512m -Xmx512m"
+
+bookkeeper:
+  affinity: {}
+  podMonitor:
+    enabled: false
+  metrics:
+    enabled: false
+  configData:
+    PULSAR_MEM: "-Xms512m -Xmx512m -XX:MaxDirectMemorySize=1g"
+    bookie.conf: |
+      journalDirectories=/bk/journal
+      ledgerDirectories=/bk/ledgers
+      ensembleSize=3
+      writeQuorum=3
+      ackQuorum=2
+      readTimeout=120
+      writeTimeout=120
+
+broker:
+  affinity: {}
+  podMonitor:
+    enabled: false
+  metrics:
+    enabled: false
+  configData:
+    PULSAR_MEM: "-Xms512m -Xmx512m"
+    managedLedgerDefaultEnsembleSize: "3"
+    managedLedgerDefaultWriteQuorum: "3"
+    managedLedgerDefaultAckQuorum: "2"
+    allowAutoTopicCreation: "true"
+    allowAutoTopicCreationType: "partitioned"
+    defaultNumberOfNamespaceBundles: "1"
+
+proxy:
+  affinity: {}
+  podMonitor:
+    enabled: false
+  metrics:
+    enabled: false
+  configData:
+    PULSAR_MEM: "-Xms256m -Xmx256m"
+
+autorecovery:
+  affinity: {}
+  podMonitor:
+    enabled: false
+  metrics:
+    enabled: false
+
+toolset:
+  enabled: true
+
+monitoring:
+  prometheus_operator:
+    enabled: false
+
+kube-prometheus-stack:
+  enabled: false
+  prometheus:
+    enabled: false
+  grafana:
+    enabled: false
+  alertmanager:
+    enabled: false
+  prometheusOperator:
+    enabled: false
+
+custom:
+  monitoring:
+    enable: false
+
+affinity: {}
+tolerations: []
