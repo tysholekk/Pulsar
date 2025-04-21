@@ -1,0 +1,137 @@
+components:
+  zookeeper: true
+  bookkeeper: true
+  broker: true
+  proxy: true
+  autorecovery: true
+  toolset: true
+  prometheus: false
+  pulsar_manager: false
+  functions: false
+  function_worker: false
+
+replicaCount:
+  zookeeper: 3
+  bookkeeper: 3
+  broker: 3
+  proxy: 1
+
+# GLOBAL tolerations if нужны
+tolerations: []
+
+# Zookeeper
+zookeeper:
+  replicaCount: 3
+  securityContext:
+    fsGroup: 1000
+  affinity: {}
+  volumes:
+    data:
+      storageClassName: local-storage
+  podMonitor:
+    enabled: false
+  metrics:
+    enabled: false
+  configData:
+    PULSAR_MEM: "-Xms512m -Xmx512m"
+
+# BookKeeper
+bookkeeper:
+  replicaCount: 3
+  securityContext:
+    fsGroup: 1000
+  enabled: true
+  affinity: {}
+  volumes:
+    # use a persistent volume or emptyDir
+    persistence: true
+    journal:
+      storageClassName: local-storage
+    ledgers:
+      storageClassName: local-storage
+  podMonitor:
+    enabled: false
+  metrics:
+    enabled: false
+  configData:
+    PULSAR_MEM: "-Xms512m -Xmx512m -XX:MaxDirectMemorySize=1g"
+    bookie.conf: |
+      journalDirectories=/bk/journal
+      ledgerDirectories=/bk/ledgers
+      ensembleSize=2
+      writeQuorum=2
+      ackQuorum=2
+      readTimeout=60
+      writeTimeout=60
+      managedLedgerDefaultEnsembleSize=2
+      managedLedgerDefaultWriteQuorum=2
+      managedLedgerDefaultAckQuorum=1
+      replicationWorkersEnabled=true
+
+# Broker
+broker:
+  replicaCount: 3
+  affinity: {}
+  volumes:
+    data:
+      storageClassName: local-storage
+  podMonitor:
+    enabled: false
+  metrics:
+    enabled: false
+  configData:
+    PULSAR_MEM: "-Xms512m -Xmx512m"
+    managedLedgerDefaultEnsembleSize: "3"
+    managedLedgerDefaultWriteQuorum: "3"
+    managedLedgerDefaultAckQuorum: "2"
+    allowAutoTopicCreation: "true"
+    allowAutoTopicCreationType: "partitioned"
+    defaultNumberOfNamespaceBundles: "1"
+    authenticationEnabled: "false"
+    authorizationEnabled: "false"
+    authenticationProviders: ""
+    superUserRoles: ""
+
+# Proxy
+proxy:
+  replicaCount: 3
+  affinity: {}
+  podMonitor:
+    enabled: false
+  metrics:
+    enabled: false
+  configData:
+    PULSAR_MEM: "-Xms256m -Xmx256m"
+    authenticationEnabled: "false"
+    authorizationEnabled: "false"
+    authenticationProviders: ""
+
+# Autorecovery
+autorecovery:
+  affinity: {}
+  podMonitor:
+    enabled: false
+  metrics:
+    enabled: false
+
+toolset:
+  enabled: true
+
+monitoring:
+  prometheus_operator:
+    enabled: false
+
+kube-prometheus-stack:
+  enabled: false
+  prometheus:
+    enabled: false
+  grafana:
+    enabled: false
+  alertmanager:
+    enabled: false
+  prometheusOperator:
+    enabled: false
+
+custom:
+  monitoring:
+    enable: false
