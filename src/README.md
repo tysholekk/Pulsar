@@ -18,3 +18,5 @@ helm dependency build
 
 
 helm install pulsar -f my-values.yaml ./charts/pulsar
+
+kubectl exec -it pulsar-toolset-0 -n pulsar -- /pulsar/bin/pulsar-perf produce -r 50 -m 10000 persistent://public/default/RawData
