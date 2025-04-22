@@ -65,7 +65,15 @@ data:
 
     def producer_task():
         global message_counter
-        client = pulsar.Client(PULSAR_SERVICE_URL)
+        client = pulsar.Client(
+            PULSAR_SERVICE_URL,
+            operation_timeout_seconds=10,
+            io_threads=2,
+            message_listener_threads=2,
+            connections_per_broker=2,
+            starting_backoff_interval_ms=100,
+            max_backoff_interval_ms=2000
+        )
         producer = client.create_producer(TOPIC_NAME)
 
         while True:

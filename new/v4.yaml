@@ -58,8 +58,8 @@ bookkeeper:
     bookie.conf: |
       journalDirectories=/bk/journal
       ledgerDirectories=/bk/ledgers
-      ensembleSize=2
-      writeQuorum=2
+      ensembleSize=3
+      writeQuorum=3
       ackQuorum=2
       readTimeout=60
       writeTimeout=60
@@ -92,10 +92,10 @@ broker:
     authorizationEnabled: "false"
     authenticationProviders: ""
     superUserRoles: ""
-    brokerServiceKeepAliveIntervalSeconds: "10"
+    brokerServiceKeepAliveIntervalSeconds: "5"
     initialDelaySeconds: "5"
     periodSeconds: "5"
-    failureThreshold: "1"
+    failureThreshold: "3"
 
 # Proxy
 proxy:
@@ -113,6 +113,7 @@ proxy:
 
 # Autorecovery
 autorecovery:
+  replicaCount: 3
   affinity: {}
   podMonitor:
     enabled: false
