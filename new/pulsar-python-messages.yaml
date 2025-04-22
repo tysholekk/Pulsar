@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulsar-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pulsar-test
+  template:
+    metadata:
+      labels:
+        app: pulsar-test
+    spec:
+      containers:
+        - name: pulsar-test
+          image: python:3.11
+          command: ["/bin/sh", "-c"]
+          args:
+            - pip install pulsar-client && python /app/pulsar_test.py
+          volumeMounts:
+            - name: pulsar-test-script
+              mountPath: /app
+          env:
+            - name: PULSAR_SERVICE_URL
+              value: "pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650"
+      volumes:
+        - name: pulsar-test-script
+          configMap:
+            name: pulsar-test-script
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pulsar-test-script
+data:
+  pulsar_test.py: |
+    import pulsar
+    import time
+    import threading
+    import logging
+    from datetime import datetime
+    import uuid
+
+    logging.basicConfig(level=logging.INFO)
+
+    PULSAR_SERVICE_URL = 'pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650'
+    TOPIC_NAME = 'persistent://public/default/RawData'
+
+    def producer_task():
+        client = pulsar.Client(PULSAR_SERVICE_URL)
+        producer = client.create_producer(TOPIC_NAME)
+
+        while True:
+            msg_id = str(uuid.uuid4())
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            message = f"{msg_id} | {timestamp}"
+            try:
+                producer.send(message.encode('utf-8'))
+                logging.info(f"Produced: {message}")
+            except Exception as e:
+                logging.error(f"Producer error: {e}")
+                client.close()
+                time.sleep(5)
+                client = pulsar.Client(PULSAR_SERVICE_URL)
+                producer = client.create_producer(TOPIC_NAME)
+            time.sleep(1)
+
+    def consumer_task():
+        client = pulsar.Client(PULSAR_SERVICE_URL)
+        consumer = client.subscribe(TOPIC_NAME, subscription_name='test-subscription', consumer_type=pulsar.ConsumerType.Shared)
+
+        while True:
+            try:
+                msg = consumer.receive()
+                data = msg.data().decode('utf-8')
+                logging.info(f"Consumed: {data}")
+                consumer.acknowledge(msg)
+            except Exception as e:
+                logging.error(f"Consumer error: {e}")
+                client.close()
+                time.sleep(5)
+                client = pulsar.Client(PULSAR_SERVICE_URL)
+                consumer = client.subscribe(TOPIC_NAME, subscription_name='test-subscription', consumer_type=pulsar.ConsumerType.Shared)
+
+    producer_thread = threading.Thread(target=producer_task, daemon=True)
+    consumer_thread = threading.Thread(target=consumer_task, daemon=True)
+
+    producer_thread.start()
+    consumer_thread.start()
+
+    while True:
+        time.sleep(10)
