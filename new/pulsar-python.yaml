@@ -128,7 +128,7 @@ spec:
       containers:
         - name: producer
           image: python:3.10-slim
-          command: [ "sh", "-c", "pip install --no-cache-dir pulsar-client && python3 /app/producer.py" ]
+          command: [ "sh", "-c", "pip install --no-cache-dir --prefix=/usr/local pulsar-client && python3 /app/producer.py" ]
           env:
             - name: PULSAR_SERVICE_URL
               value: "pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650"
@@ -160,7 +160,7 @@ spec:
       containers:
         - name: consumer
           image: python:3.10-slim
-          command: [ "sh", "-c", "pip install --no-cache-dir pulsar-client && python3 /app/consumer.py" ]
+          command: [ "sh", "-c", "pip install --no-cache-dir --prefix=/usr/local pulsar-client && python3 /app/consumer.py" ]
           env:
             - name: PULSAR_SERVICE_URL
               value: "pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650"
