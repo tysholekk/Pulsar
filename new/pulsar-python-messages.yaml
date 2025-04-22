@@ -21,9 +21,6 @@ spec:
           volumeMounts:
             - name: pulsar-test-script
               mountPath: /app
-          env:
-            - name: PULSAR_SERVICE_URL
-              value: "pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650"
       volumes:
         - name: pulsar-test-script
           configMap:
@@ -40,19 +37,25 @@ data:
     import threading
     import logging
     from datetime import datetime
-    import uuid
 
     logging.basicConfig(level=logging.INFO)
 
     PULSAR_SERVICE_URL = 'pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650'
     TOPIC_NAME = 'persistent://public/default/RawData'
 
+    message_counter = 1
+    counter_lock = threading.Lock()
+
     def producer_task():
+        global message_counter
         client = pulsar.Client(PULSAR_SERVICE_URL)
         producer = client.create_producer(TOPIC_NAME)
 
         while True:
-            msg_id = str(uuid.uuid4())
+            with counter_lock:
+                msg_id = message_counter
+                message_counter += 1
+
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             message = f"{msg_id} | {timestamp}"
             try:
