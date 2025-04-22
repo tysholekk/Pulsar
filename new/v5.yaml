@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulsar-test
+  namespace: pulsar
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pulsar-test
+  template:
+    metadata:
+      labels:
+        app: pulsar-test
+    spec:
+      containers:
+        - name: pulsar-test
+          image: python:3.11-slim
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              export PYTHONUSERBASE=/writable/.local && \
+              pip install --no-cache-dir --user pulsar-client && \
+              python /app/pulsar_test.py
+          env:
+            - name: PYTHONUSERBASE
+              value: "/writable/.local"  # Writable directory for pip installations
+          volumeMounts:
+            - name: pulsar-test-script
+              mountPath: /app  # Mount the ConfigMap for the script
+            - name: writable-storage
+              mountPath: /writable  # Mount writable storage for pip installations
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: pulsar-test-script
+          configMap:
+            name: pulsar-test-script
+        - name: writable-storage
+          emptyDir: {}  # Writable storage
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pulsar-test-script
+  namespace: pulsar
+data:
+  pulsar_test.py: |
+    import pulsar
+    import time
+    import threading
+    import logging
+    from datetime import datetime
+
+    logging.basicConfig(level=logging.INFO)
+
+    PULSAR_SERVICE_URL = 'pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650'
+    TOPIC_NAME = 'persistent://public/default/RawData'
+
+    message_counter = 1
+    counter_lock = threading.Lock()
+
+    def producer_task():
+        global message_counter
+        client = pulsar.Client(PULSAR_SERVICE_URL)
+        producer = client.create_producer(TOPIC_NAME)
+
+        while True:
+            with counter_lock:
+                msg_id = message_counter
+                message_counter += 1
+
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            message = f"{msg_id} | {timestamp}"
+            try:
+                producer.send(message.encode('utf-8'))
+                logging.info(f"Produced: {message}")
+            except Exception as e:
+                logging.error(f"Producer error: {e}")
+                client.close()
+                time.sleep(5)
+                client = pulsar.Client(PULSAR_SERVICE_URL)
+                producer = client.create_producer(TOPIC_NAME)
+            time.sleep(1)
+
+    def consumer_task():
+        client = pulsar.Client(PULSAR_SERVICE_URL)
+        consumer = client.subscribe(TOPIC_NAME, subscription_name='test-subscription', consumer_type=pulsar.ConsumerType.Shared)
+
+        while True:
+            try:
+                msg = consumer.receive()
+                data = msg.data().decode('utf-8')
+                logging.info(f"Consumed: {data}")
+                consumer.acknowledge(msg)
+            except Exception as e:
+                logging.error(f"Consumer error: {e}")
+                client.close()
+                time.sleep(5)
+                client = pulsar.Client(PULSAR_SERVICE_URL)
+                consumer = client.subscribe(TOPIC_NAME, subscription_name='test-subscription', consumer_type=pulsar.ConsumerType.Shared)
+
+    producer_thread = threading.Thread(target=producer_task, daemon=True)
+    consumer_thread = threading.Thread(target=consumer_task, daemon=True)
+
+    producer_thread.start()
+    consumer_thread.start()
+
+    while True:
+        time.sleep(10)
