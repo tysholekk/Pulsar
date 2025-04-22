@@ -28,3 +28,6 @@ kubectl exec -it pulsar-toolset-0 -n pulsar -- \
   --stats-interval-seconds 1 \
   -u pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650 \
   persistent://public/default/RawData
+
+
+kubectl apply -f pulsar-python.yaml

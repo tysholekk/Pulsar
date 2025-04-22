@@ -1,0 +1,177 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pulsar-python-scripts
+  namespace: pulsar
+data:
+  producer.py: |
+    import pulsar
+    import time
+    import os
+    from datetime import datetime
+
+    print("🔧 Starting producer setup...")
+
+    service_url = os.getenv("PULSAR_SERVICE_URL")
+    topic = os.getenv("TOPIC")
+    rate = 1 
+
+    print(f"🔗 Connecting to {service_url} / topic {topic}")
+
+    while True:
+        try:
+            client = pulsar.Client(service_url)
+            producer = client.create_producer(topic)
+            print(f"🚀 Producer ready: {topic} @ {rate} msg/s")
+
+            i = 0
+            while True:
+                send_time_unix = time.time()
+                send_time_str = datetime.fromtimestamp(send_time_unix).strftime('%Y-%m-%d %H:%M:%S')
+                msg = f"{i}|{send_time_str}|{send_time_unix}"
+                print(f"➡️ Sending message {i} at {send_time_str}...")
+                try:
+                    producer.send(msg.encode("utf-8"))
+                    print(f"✅ Sent: {msg}")
+                except Exception as e:
+                    print(f"❌ Send ERROR: {e}")
+                    break 
+
+                i += 1
+                time.sleep(1.0 / rate)
+
+        except Exception as e:
+            print(f"❌ Client ERROR: {e}")
+        finally:
+            try:
+                client.close()
+            except:
+                pass
+            print("🔄 Reconnecting in 5 seconds...")
+            time.sleep(5)
+
+  consumer.py: |
+    import pulsar
+    import os
+    import time
+    from datetime import datetime
+
+    service_url = os.getenv("PULSAR_SERVICE_URL")
+    topic = os.getenv("TOPIC")
+    sub = os.getenv("SUBSCRIPTION", "delay-check-sub")
+
+    while True:
+        try:
+            client = pulsar.Client(service_url)
+            consumer = client.subscribe(topic, sub)
+
+            print(f"🎯 Consumer started on: {topic} / sub: {sub}")
+
+            received_count = 0
+            latencies = []
+            start_minute = time.time()
+
+            while True:
+                try:
+                    msg = consumer.receive(timeout_millis=5000)
+                    recv_time_unix = time.time()
+                    recv_time_str = datetime.fromtimestamp(recv_time_unix).strftime('%Y-%m-%d %H:%M:%S')
+                    data = msg.data().decode()
+                    index, send_time_str, send_time_unix = data.split('|')
+                    send_time_unix = float(send_time_unix)
+                    latency = (recv_time_unix - send_time_unix) * 1000
+                    latencies.append(latency)
+                    received_count += 1
+
+                    print(f"📥 Received msg {index}: sent at {send_time_str}, received at {recv_time_str}, latency: {latency:.2f} ms")
+                    consumer.acknowledge(msg)
+
+                    if recv_time_unix - start_minute >= 60:
+                        avg_latency = sum(latencies) / len(latencies)
+                        max_latency = max(latencies)
+                        print(f"🕒 1 min report: messages: {received_count}, avg latency: {avg_latency:.2f} ms, max latency: {max_latency:.2f} ms")
+                        if max_latency > 5000:
+                            print("⚠️ Detected high latency spike! Possible node issue.")
+                        latencies = []
+                        received_count = 0
+                        start_minute = time.time()
+
+                except Exception as e:
+                    print(f"❌ Receive ERROR: {e}")
+                    break 
+
+        except Exception as e:
+            print(f"❌ Client ERROR: {e}")
+        finally:
+            try:
+                client.close()
+            except:
+                pass
+            print("🔄 Reconnecting in 5 seconds...")
+            time.sleep(5)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulsar-python-producer
+  namespace: pulsar
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pulsar-python-producer
+  template:
+    metadata:
+      labels:
+        app: pulsar-python-producer
+    spec:
+      containers:
+        - name: producer
+          image: python:3.10-slim
+          command: ["sh", "-c", "pip install pulsar-client && python3 /app/producer.py"]
+          env:
+            - name: PULSAR_SERVICE_URL
+              value: "pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650"
+            - name: TOPIC
+              value: "persistent://public/default/RawData"
+          volumeMounts:
+            - name: code
+              mountPath: /app
+      volumes:
+        - name: code
+          configMap:
+            name: pulsar-python-scripts
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulsar-python-consumer
+  namespace: pulsar
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pulsar-python-consumer
+  template:
+    metadata:
+      labels:
+        app: pulsar-python-consumer
+    spec:
+      containers:
+        - name: consumer
+          image: python:3.10-slim
+          command: ["sh", "-c", "pip install pulsar-client && python3 /app/consumer.py"]
+          env:
+            - name: PULSAR_SERVICE_URL
+              value: "pulsar://pulsar-proxy.pulsar.svc.cluster.local:6650"
+            - name: TOPIC
+              value: "persistent://public/default/RawData"
+            - name: SUBSCRIPTION
+              value: "delay-check-sub"
+          volumeMounts:
+            - name: code
+              mountPath: /app
+      volumes:
+        - name: code
+          configMap:
+            name: pulsar-python-scripts
